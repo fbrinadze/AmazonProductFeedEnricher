@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import authRoutes from './routes/auth.routes.js';
 
 dotenv.config();
 
@@ -13,6 +14,9 @@ app.use(express.json());
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Authentication routes
+app.use('/api/auth', authRoutes);
 
 app.listen(PORT, () => {
   console.log(`Backend server running on port ${PORT}`);
