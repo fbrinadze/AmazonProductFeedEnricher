@@ -27,8 +27,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # Editor
-.vscode/*
-!.vscode/extensions.json
+.vscode/
 .idea
 .DS_Store
 *.suo
@@ -36,6 +35,17 @@ lerna-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
+# Kiro
+.kiro/
+
+# Tests
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/tests/
+**/__tests__/
 
 # Uploads
 uploads/
