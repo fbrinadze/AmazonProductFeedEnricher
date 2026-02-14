@@ -57,3 +57,6 @@ uploads/
 # Database
 *.db
 *.sqlite
+
+# AWS RDS Certificates
+backend/certs/

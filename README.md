@@ -48,10 +48,56 @@ cp frontend/.env.example frontend/.env
 ```
 
 3. Set up the database:
+
+**Option 1: Local PostgreSQL (Development)**
+
+Automated setup:
 ```bash
+cd backend
+./scripts/setup-db.sh
+```
+
+Manual setup:
+```bash
+# Create database manually (see backend/DATABASE_SETUP.md for details)
+psql postgres
+CREATE DATABASE amazon_enrichment;
+CREATE USER user WITH PASSWORD 'password';
+GRANT ALL PRIVILEGES ON DATABASE amazon_enrichment TO user;
+\q
+
+# Run migrations
 cd backend
 npm run prisma:migrate
 ```
+
+**Option 2: AWS RDS PostgreSQL (Production)**
+
+See [backend/AWS_RDS_SETUP.md](backend/AWS_RDS_SETUP.md) for detailed instructions.
+
+Quick setup:
+```bash
+cd backend
+
+# Download RDS SSL certificate
+npm run rds:download-cert
+
+# Configure .env with RDS details
+# Set USE_AWS_RDS=true
+
+# Test connection
+npm run rds:test
+
+# Run migrations
+npm run rds:migrate
+
+# Seed database
+npm run prisma:seed
+```
+
+**Default admin credentials after seeding:**
+- Email: admin@bcibrands.com
+- Password: admin123
 
 ### Development
 

@@ -21,6 +21,7 @@
     "@radix-ui/react-toast": "^1.1.5",
     "ag-grid-community": "^31.0.3",
     "ag-grid-react": "^31.0.3",
+    "aws-sdk": "1.18.0",
     "axios": "^1.6.7",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
@@ -45,7 +46,7 @@
     "prettier": "^3.2.5",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.3.3",
-    "vite": "^5.0.12",
-    "vitest": "^1.2.2"
+    "vite": "^7.3.1",
+    "vitest": "^4.0.18"
   }
 }

@@ -1,0 +1,139 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email         String    @unique @db.VarChar(255)
+  passwordHash  String    @map("password_hash") @db.VarChar(255)
+  fullName      String    @map("full_name") @db.VarChar(255)
+  role          String    @default("user") @db.VarChar(20)
+  isActive      Boolean   @default(true) @map("is_active")
+  failedLogins  Int       @default(0) @map("failed_logins")
+  lockedUntil   DateTime? @map("locked_until") @db.Timestamp(6)
+  lastLoginAt   DateTime? @map("last_login_at") @db.Timestamp(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  uploads           Upload[]
+  mappingTemplates  MappingTemplate[]
+  auditLogs         AuditLog[]
+
+  @@map("users")
+}
+
+model Upload {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId              String    @map("user_id") @db.Uuid
+  filename            String    @db.VarChar(500)
+  originalSize        BigInt?   @map("original_size")
+  rowCount            Int?      @map("row_count")
+  errorCount          Int       @default(0) @map("error_count")
+  warningCount        Int       @default(0) @map("warning_count")
+  passCount           Int       @default(0) @map("pass_count")
+  status              String    @default("pending") @db.VarChar(20)
+  filePath            String?   @map("file_path") @db.VarChar(1000)
+  exportPath          String?   @map("export_path") @db.VarChar(1000)
+  mappingTemplateId   String?   @map("mapping_template_id") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+
+  user        User        @relation(fields: [userId], references: [id])
+  uploadRows  UploadRow[]
+
+  @@map("uploads")
+}
+
+model UploadRow {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  uploadId          String   @map("upload_id") @db.Uuid
+  rowNumber         Int      @map("row_number")
+  originalData      Json     @map("original_data") @db.JsonB
+  enrichedData      Json?    @map("enriched_data") @db.JsonB
+  validationResults Json?    @map("validation_results") @db.JsonB
+  status            String   @default("pending") @db.VarChar(20)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  upload Upload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+
+  @@map("upload_rows")
+}
+
+model MappingTemplate {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  name      String   @db.VarChar(255)
+  isDefault Boolean  @default(false) @map("is_default")
+  mappings  Json     @map("mappings") @db.JsonB
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("mapping_templates")
+}
+
+model ValidationRule {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fieldName  String   @map("field_name") @db.VarChar(100)
+  ruleType   String   @map("rule_type") @db.VarChar(50)
+  ruleConfig Json     @map("rule_config") @db.JsonB
+  severity   String   @db.VarChar(20)
+  message    String   @db.VarChar(500)
+  isActive   Boolean  @default(true) @map("is_active")
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@map("validation_rules")
+}
+
+model LookupTable {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tableType   String   @map("table_type") @db.VarChar(50)
+  sourceValue String   @map("source_value") @db.VarChar(255)
+  targetValue String   @map("target_value") @db.VarChar(255)
+  brand       String?  @db.VarChar(100)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@unique([tableType, sourceValue, brand])
+  @@map("lookup_tables")
+}
+
+model BrandConfig {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  brandName            String   @unique @map("brand_name") @db.VarChar(100)
+  amazonBrand          String   @map("amazon_brand") @db.VarChar(100)
+  defaultManufacturer  String?  @map("default_manufacturer") @db.VarChar(255)
+  defaultFulfillment   String   @default("DEFAULT") @map("default_fulfillment") @db.VarChar(20)
+  isActive             Boolean  @default(true) @map("is_active")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@map("brand_config")
+}
+
+model AuditLog {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String?   @map("user_id") @db.Uuid
+  action     String    @db.VarChar(100)
+  entityType String?   @map("entity_type") @db.VarChar(50)
+  entityId   String?   @map("entity_id") @db.Uuid
+  details    Json?     @db.JsonB
+  ipAddress  String?   @map("ip_address") @db.VarChar(45)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("audit_log")
+}
