@@ -29,7 +29,7 @@ echo ""
 
 # Database configuration
 DB_NAME="amazon_enrichment"
-DB_USER="user"
+DB_USER="enrichment_user"
 DB_PASSWORD="password"
 
 echo "📦 Creating database and user..."
