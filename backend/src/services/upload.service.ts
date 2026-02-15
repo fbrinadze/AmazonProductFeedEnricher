@@ -1,6 +1,9 @@
 import { PrismaClient } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
+import { csvParserService, ParsedData } from './csv-parser.service.js';
+import { excelParserService } from './excel-parser.service.js';
+import { columnMappingService, AutoMappingResult } from './column-mapping.service.js';
 
 const prisma = new PrismaClient();
 
@@ -25,6 +28,13 @@ export interface UploadRecord {
   exportPath: string | null;
   mappingTemplateId: string | null;
   createdAt: Date;
+}
+
+export interface UploadPreview {
+  headers: string[];
+  previewRows: Record<string, any>[];
+  totalRows: number;
+  autoMapping?: AutoMappingResult;
 }
 
 export class UploadService {
@@ -113,6 +123,49 @@ export class UploadService {
    */
   validateFileExists(filePath: string): boolean {
     return fs.existsSync(filePath) && fs.statSync(filePath).isFile();
+  }
+
+  /**
+   * Parse uploaded file and generate preview
+   * Returns headers and first 10 rows
+   */
+  async parseAndPreview(filePath: string, sheetName?: string): Promise<UploadPreview> {
+    const ext = path.extname(filePath).toLowerCase();
+    let parsedData: ParsedData;
+
+    if (ext === '.csv') {
+      parsedData = await csvParserService.parseCSV(filePath);
+    } else if (ext === '.xlsx' || ext === '.xls') {
+      parsedData = await excelParserService.parseExcel(filePath, { sheetName });
+    } else {
+      throw new Error('Unsupported file format');
+    }
+
+    // Return first 10 rows as preview
+    const previewRows = parsedData.rows.slice(0, 10);
+
+    // Auto-map columns to Amazon fields
+    const autoMapping = columnMappingService.autoMapColumns(parsedData.headers);
+
+    return {
+      headers: parsedData.headers,
+      previewRows,
+      totalRows: parsedData.rowCount,
+      autoMapping,
+    };
+  }
+
+  /**
+   * Get sheet names from Excel file
+   */
+  getExcelSheetNames(filePath: string): string[] {
+    const ext = path.extname(filePath).toLowerCase();
+    
+    if (ext !== '.xlsx' && ext !== '.xls') {
+      throw new Error('File is not an Excel file');
+    }
+
+    return excelParserService.getSheetNames(filePath);
   }
 }
 
