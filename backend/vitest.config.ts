@@ -5,11 +5,10 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
+    poolMatchGlobs: [
+      ['**/*.test.ts', 'forks'],
+    ],
+    fileParallelism: false,
     testTimeout: 10000,
     coverage: {
       provider: 'v8',

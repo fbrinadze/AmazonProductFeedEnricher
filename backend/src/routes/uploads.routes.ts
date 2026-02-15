@@ -5,6 +5,7 @@ import { PrismaClient } from '@prisma/client';
 import { upload } from '../config/multer.js';
 import { uploadService } from '../services/upload.service.js';
 import { authenticateJWT } from '../middleware/auth.middleware.js';
+import { validationEngine } from '../services/validation-engine.service.js';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -55,7 +56,7 @@ router.post('/', (req: Request, res: Response, next) => {
     }
 
     // No error, proceed to the actual handler
-    next();
+    return next();
   });
 }, async (req: Request, res: Response) => {
   try {
@@ -381,7 +382,124 @@ router.get('/:id/sheets', async (req: Request, res: Response) => {
   }
 });
 
-export default router;
+/**
+ * POST /api/uploads/:id/validate
+ * Run validation on all rows in an upload
+ */
+router.post('/:id/validate', async (req: Request, res: Response) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'User not authenticated',
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
+
+    // Get the upload
+    const upload = await uploadService.getUploadById(req.params.id);
+
+    if (!upload) {
+      return res.status(404).json({
+        error: {
+          code: 'UPLOAD_NOT_FOUND',
+          message: 'Upload not found',
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
+
+    // Check authorization: user can only validate their own uploads unless admin
+    if (upload.userId !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to validate this upload',
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
+
+    // Check if file exists
+    if (!upload.filePath || !uploadService.validateFileExists(upload.filePath)) {
+      return res.status(400).json({
+        error: {
+          code: 'FILE_NOT_FOUND',
+          message: 'Upload file not found',
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
+
+    // Update upload status to processing
+    await uploadService.updateUploadStatus(req.params.id, 'processing');
+
+    // Parse the file to get all rows if upload_rows don't exist yet
+    const existingRows = await prisma.uploadRow.count({
+      where: { uploadId: req.params.id },
+    });
+
+    if (existingRows === 0) {
+      // Get the full parsed data (not just preview)
+      const ext = upload.filePath.split('.').pop()?.toLowerCase();
+      let allRows: Record<string, any>[] = [];
+      
+      if (ext === 'csv') {
+        const { csvParserService } = await import('../services/csv-parser.service.js');
+        const fullData = await csvParserService.parseCSV(upload.filePath);
+        allRows = fullData.rows;
+      } else if (ext === 'xlsx' || ext === 'xls') {
+        const { excelParserService } = await import('../services/excel-parser.service.js');
+        const fullData = await excelParserService.parseExcel(upload.filePath, {});
+        allRows = fullData.rows;
+      }
+
+      // Create upload_rows for all rows
+      const rowsToCreate = allRows.map((row, index) => ({
+        uploadId: req.params.id,
+        rowNumber: index + 1,
+        originalData: row,
+        status: 'pending',
+      }));
+
+      await prisma.uploadRow.createMany({
+        data: rowsToCreate,
+      });
+    }
+
+    // Run validation engine on all rows
+    const validationResult = await validationEngine.validate(req.params.id);
+
+    return res.json({
+      uploadId: validationResult.uploadId,
+      totalRows: validationResult.totalRows,
+      passCount: validationResult.passCount,
+      errorCount: validationResult.errorCount,
+      warningCount: validationResult.warningCount,
+      healthScore: validationResult.healthScore,
+      message: 'Validation completed successfully',
+    });
+  } catch (error) {
+    console.error('Validation error:', error);
+
+    // Update upload status to failed
+    try {
+      await uploadService.updateUploadStatus(req.params.id, 'failed');
+    } catch (updateError) {
+      console.error('Failed to update upload status:', updateError);
+    }
+
+    return res.status(500).json({
+      error: {
+        code: 'VALIDATION_FAILED',
+        message: error instanceof Error ? error.message : 'Failed to validate upload',
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }
+});
 
 /**
  * POST /api/uploads/:id/apply-mapping
@@ -492,3 +610,5 @@ router.post('/:id/apply-mapping', async (req: Request, res: Response) => {
     });
   }
 });
+
+export default router;
