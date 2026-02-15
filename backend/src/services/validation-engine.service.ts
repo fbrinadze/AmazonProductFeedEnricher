@@ -1,6 +1,8 @@
 import { PrismaClient } from '@prisma/client';
+import { EnrichmentService } from './enrichment.service.js';
 
 const prisma = new PrismaClient();
+const enrichmentService = new EnrichmentService();
 
 export interface ValidationRule {
   id: string;
@@ -391,6 +393,23 @@ export class ValidationEngine {
       for (const rule of this.rules) {
         const issues = this.applyRule(rule, uploadRow);
         allIssues.push(...issues);
+      }
+
+      // Get enrichment suggestions and convert to info-level validation issues
+      const data = uploadRow.enrichedData || uploadRow.originalData;
+      const enrichmentSuggestions = await enrichmentService.getEnrichmentSuggestions(data);
+      
+      for (const suggestion of enrichmentSuggestions) {
+        // Only add optional field suggestions as info-level issues
+        // Other suggestions (color_map, size_map, etc.) are already handled by validation rules
+        if (suggestion.confidence === 'low' && suggestion.suggestedValue === '') {
+          allIssues.push({
+            field: suggestion.field,
+            rule: 'optional_field_suggestion',
+            severity: 'info',
+            message: suggestion.reason,
+          });
+        }
       }
 
       rowIssuesMap.set(uploadRow.id, allIssues);
